@@ -1,0 +1,5 @@
+name: "Translation Linter"
+description: "Lints translation for potentially harmful content"
+runs:
+  using: "docker"
+  image: "Dockerfile"
