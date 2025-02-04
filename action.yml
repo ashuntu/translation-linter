@@ -1,5 +1,16 @@
 name: "Translation Linter"
 description: "Lints translation for potentially harmful content"
+inputs:
+  translation-dir:
+    description: "Directory with translations"
+    required: true
+  file-mask:
+    description: "Regex match for files containing translations"
+    required: true
+    default: "app_(.*)\\.arb"
 runs:
   using: "docker"
   image: "Dockerfile"
+  args:
+    - ${{ inputs.translation-dir }}
+    - ${{ inputs.file-mask }}

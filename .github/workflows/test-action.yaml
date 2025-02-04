@@ -1,0 +1,23 @@
+name: test-action
+on:
+  workflow_dispatch: 
+  pull_request: 
+  push:
+    branches: [main]
+
+jobs:
+  # Example using this action
+  # Note that EN translations are effectively ignored (they are the source)
+  # ES translations in this example should be acceptable and accurate
+  # FR translations in this example should contain some unacceptable words
+  translation-lint-action:
+    name: ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: TranslationLint
+        uses: ./ # when actually using this action, replace with ashuntu/translation-linter
+        with:
+          translation-dir: "translations"
+          file-mask: "example_(.*)\\.arb"
