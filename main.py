@@ -9,8 +9,8 @@ import re
 import argparse
 
 
-source_dir = "" #sys.argv[1]
-file_mask = "" #sys.argv[2]
+source_dir = ""
+file_mask = ""
 TARGET_LANG = "en"
 
 
@@ -51,17 +51,28 @@ def find_line(file_lines: list[str], lookup: str) -> int:
     return -1
 
 
-def translate(file_name: str, file_lines: list[str], from_code: str, to_code: str):
+def translate(file_path: str):
+
+    file_name = os.path.basename(file_path)
+    matches = re.match(file_mask, file_name)
+    if not matches or not matches.groups(1):
+        return
+
+    from_code = matches.groups(1)[0]
+    to_code = TARGET_LANG
 
     if from_code == TARGET_LANG:
         return
 
-    data = json.loads("\n".join(file_lines))
+    file = open(file_path, "r")
+    file_lines = file.readlines()
+    file_json = json.loads("\n".join(file_lines))
+    file.close()
 
     log = []
     warning_level = WarningEnum.OK
 
-    if not data:
+    if not file_json:
         log.append(f"::group::⚫️ Translating {file_name}")
         log.append("No translations in file")
         log.append("::endgroup::")
@@ -86,10 +97,10 @@ def translate(file_name: str, file_lines: list[str], from_code: str, to_code: st
     line_log: list[tuple[int, str]] = []
 
     # translate values from json
-    for text in data:
-        if not isinstance(data[text], str): continue
+    for text in file_json:
+        if not isinstance(file_json[text], str): continue
 
-        text: str = data[text]
+        text: str = file_json[text]
         line = find_line(file_lines, text)
 
         translated_text = argostranslate.translate.translate(text, from_code, to_code)
@@ -100,7 +111,7 @@ def translate(file_name: str, file_lines: list[str], from_code: str, to_code: st
         if text.strip() == "":
             if warning_level.value < WarningEnum.ERROR.value:
                 warning_level = WarningEnum.ERROR
-            line_log.append((line, f"::{WarningEnum.ERROR.name.lower()} file={source_dir}/{file_name},line={line}::EMPTY STRING"))
+            line_log.append((line, f"::{WarningEnum.ERROR.name.lower()} file={file_path},line={line}::EMPTY STRING"))
             continue
 
         # We consider both the original language string and the translated
@@ -114,7 +125,7 @@ def translate(file_name: str, file_lines: list[str], from_code: str, to_code: st
             if max_prob < status_data.threshold:
                 continue
             if status_data.annotate:
-                line_log.append((line, f"::{level.name.lower()} file={source_dir}/{file_name},line={line}::{status_data.note} ({max_prob:.2f}): \"{translated_text}\""))
+                line_log.append((line, f"::{level.name.lower()} file={file_path},line={line}::{status_data.note} ({max_prob:.2f}): \"{translated_text}\""))
             if warning_level.value < level.value:
                 warning_level = level
             break
@@ -130,26 +141,38 @@ def translate(file_name: str, file_lines: list[str], from_code: str, to_code: st
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--source", "-s",
-    help="Path to directory with translation files",
-    type=str
+    help="Path to directory with translation files.",
+    type=str,
 )
 parser.add_argument(
     "--mask", "-m",
-    help="RegEx pattern to match translation files",
-    type=str
+    help="RegEx pattern to match translation files.",
+    type=str,
+    required=True,
+)
+parser.add_argument(
+    "--files", "-f",
+    help="Comma-separated string of file paths to check. These should be compatible with the file mask.",
+    type=str,
 )
 args = parser.parse_args()
 
-file_mask = str(args.mask)
-source_dir = os.path.join(os.getcwd(), args.source)
-files = os.listdir(source_dir)
-files.sort()
+if not args.files and not args.source:
+    print("Either --source or --files is required")
+    sys.exit()
 
-for filename in files:
-    with open(os.path.join(source_dir, filename)) as file:
-        matches = re.match(file_mask, filename)
-        if not matches:
-            continue
-        from_code = matches.groups(1)[0]
-        to_code = TARGET_LANG
-        translate(filename, file.readlines(), from_code, to_code)
+file_mask = str(args.mask)
+
+# --files
+if args.files:
+    for path in str(args.files).split(","):
+        translate(path)
+
+# --source
+if args.source:
+    source_dir = os.path.join(os.getcwd(), args.source)
+    files = os.listdir(source_dir)
+    files.sort()
+
+    for filename in files:
+        translate(os.path.join(source_dir, filename))

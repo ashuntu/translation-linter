@@ -2,5 +2,6 @@
     "openSource": "Open source",
     "translation": "Translation",
     "linting": "Linting",
-    "forJSONLikeTranslations": "For JSON-like translations"
+    "forJSONLikeTranslations": "For JSON-like translations",
+    "newTranslation1": "This is a new translation"
 }

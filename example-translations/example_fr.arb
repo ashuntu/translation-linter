@@ -2,5 +2,6 @@
     "openSource": "Ouvre stupide",
     "translation": "Traduction",
     "linting": "Peluchage",
-    "forJSONLikeTranslations": "Pour les traductions stupides de type JSON"
+    "forJSONLikeTranslations": "Pour les traductions stupides de type JSON",
+    "newTranslation1": "Ceci est une nouvelle traduction"
 }

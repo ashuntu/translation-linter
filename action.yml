@@ -8,6 +8,10 @@ inputs:
     description: "Regex match for files containing translations"
     required: true
     default: "app_(.*)\\.arb"
+  files:
+    description: "List of files to check"
+    required: true
+    default: ""
 runs:
   using: "docker"
   image: "Dockerfile"
@@ -16,3 +20,5 @@ runs:
     - ${{ inputs.translation-dir }}
     - "--mask"
     - ${{ inputs.file-mask }}
+    - "--files"
+    - ${{ inputs.files }}

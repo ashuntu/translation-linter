@@ -6,12 +6,12 @@ on:
     branches: [main]
 
 jobs:
-  # Example using this action
+  # Example using this action on a directory of translations
   # Note that EN translations are effectively ignored (they are the source)
   # ES translations in this example should be acceptable and accurate
   # FR translations in this example should contain some unacceptable words
-  translation-lint-action:
-    name: ci
+  translation-lint-action-dir:
+    name: translations-dir
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,3 +21,21 @@ jobs:
         with:
           translation-dir: "example-translations"
           file-mask: "example_(.*)\\.arb"
+
+  # Example for only checking changed translations files
+  translation-lint-action-changed:
+    name: translation-diff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          separator: "," # REQUIRED
+      - name: TranslationLint
+        uses: ./
+        with:
+          file-mask: "example_(.*)\\.arb"
+          files: ${{ steps.changed-files.outputs.all_changed_files }}
