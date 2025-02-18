@@ -6,10 +6,11 @@ from profanity_check import predict_prob
 from enum import Enum
 import sys
 import re
+import argparse
 
 
-TRANSLATION_DIR = sys.argv[1]
-FILE_MASK = sys.argv[2]
+source_dir = "" #sys.argv[1]
+file_mask = "" #sys.argv[2]
 TARGET_LANG = "en"
 
 
@@ -99,7 +100,7 @@ def translate(file_name: str, file_lines: list[str], from_code: str, to_code: st
         if text.strip() == "":
             if warning_level.value < WarningEnum.ERROR.value:
                 warning_level = WarningEnum.ERROR
-            line_log.append((line, f"::{WarningEnum.ERROR.name.lower()} file={TRANSLATION_DIR}/{file_name},line={line}::EMPTY STRING"))
+            line_log.append((line, f"::{WarningEnum.ERROR.name.lower()} file={source_dir}/{file_name},line={line}::EMPTY STRING"))
             continue
 
         # We consider both the original language string and the translated
@@ -113,7 +114,7 @@ def translate(file_name: str, file_lines: list[str], from_code: str, to_code: st
             if max_prob < status_data.threshold:
                 continue
             if status_data.annotate:
-                line_log.append((line, f"::{level.name.lower()} file={TRANSLATION_DIR}/{file_name},line={line}::{status_data.note} ({max_prob:.2f}): \"{translated_text}\""))
+                line_log.append((line, f"::{level.name.lower()} file={source_dir}/{file_name},line={line}::{status_data.note} ({max_prob:.2f}): \"{translated_text}\""))
             if warning_level.value < level.value:
                 warning_level = level
             break
@@ -126,20 +127,29 @@ def translate(file_name: str, file_lines: list[str], from_code: str, to_code: st
     print("\n".join(log))
 
 
-def main():
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--source", "-s",
+    help="Path to directory with translation files",
+    type=str
+)
+parser.add_argument(
+    "--mask", "-m",
+    help="RegEx pattern to match translation files",
+    type=str
+)
+args = parser.parse_args()
 
-    source_dir = os.path.join(os.getcwd(), TRANSLATION_DIR)
-    files = os.listdir(source_dir)
-    files.sort()
-    for filename in files:
-        with open(os.path.join(source_dir, filename)) as file:
-            matches = re.match(FILE_MASK, filename)
-            if not matches:
-                continue
-            from_code = matches.groups(1)[0]
-            to_code = TARGET_LANG
-            translate(filename, file.readlines(), from_code, to_code)
+file_mask = str(args.mask)
+source_dir = os.path.join(os.getcwd(), args.source)
+files = os.listdir(source_dir)
+files.sort()
 
-
-if __name__ == "__main__":
-    main()
+for filename in files:
+    with open(os.path.join(source_dir, filename)) as file:
+        matches = re.match(file_mask, filename)
+        if not matches:
+            continue
+        from_code = matches.groups(1)[0]
+        to_code = TARGET_LANG
+        translate(filename, file.readlines(), from_code, to_code)
