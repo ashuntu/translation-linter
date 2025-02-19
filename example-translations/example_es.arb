@@ -2,5 +2,6 @@
     "openSource": "Código abierto",
     "translation": "traducción",
     "linting": "pelusa",
-    "forJSONLikeTranslations": "Para traducciones tipo JSON"
+    "forJSONLikeTranslations": "Para traducciones tipo JSON",
+    "newTranslation1": "Esta es una nueva traducción"
 }
