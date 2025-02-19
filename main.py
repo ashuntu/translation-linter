@@ -51,7 +51,26 @@ def find_line(file_lines: list[str], lookup: str) -> int:
     return -1
 
 
-def translate(file_path: str):
+def init_language(from_code: str, to_code: str) -> bool:
+
+    argostranslate.package.update_package_index()
+    available_packages = argostranslate.package.get_available_packages()
+    valid_packages = list(filter(lambda x: x.from_code == from_code and x.to_code == to_code, available_packages))
+
+    if len(valid_packages) == 0:
+        return False
+
+    package_to_install = valid_packages[0]
+    argostranslate.package.install_from_path(package_to_install.download())
+    return True
+
+
+def translate(text: str, from_code: str, to_code: str) -> str:
+
+    return argostranslate.translate.translate(text, from_code, to_code)
+
+
+def process_file(file_path: str):
 
     file_name = os.path.basename(file_path)
     matches = re.match(file_mask, file_name)
@@ -79,20 +98,13 @@ def translate(file_path: str):
         print("\n".join(log))
         return
 
-    # Download and install Argos Translate package
-    argostranslate.package.update_package_index()
-    available_packages = argostranslate.package.get_available_packages()
-    valid_packages = list(filter(lambda x: x.from_code == from_code and x.to_code == to_code, available_packages))
-
-    if len(valid_packages) == 0:
+    valid_language = init_language(from_code, to_code)
+    if not valid_language:
         log.append(f"::group::🔴 Translating {file_name}")
         log.append("Could not translate this language")
         log.append("::endgroup::")
         print("\n".join(log))
         return
-
-    package_to_install = valid_packages[0]
-    argostranslate.package.install_from_path(package_to_install.download())
 
     line_log: list[tuple[int, str]] = []
 
@@ -103,7 +115,7 @@ def translate(file_path: str):
         text: str = file_json[text]
         line = find_line(file_lines, text)
 
-        translated_text = argostranslate.translate.translate(text, from_code, to_code)
+        translated_text = translate(text, from_code, to_code)
         line_log.append((line, f"{line} ({from_code}): {text}"))
         line_log.append((line, "{} ({}): {}".format(" " * len(f"{line}"), to_code, translated_text)))
 
@@ -166,7 +178,7 @@ file_mask = str(args.mask)
 # --files
 if args.files:
     for path in str(args.files).split(","):
-        translate(path)
+        process_file(path)
 
 # --source
 if args.source:
@@ -175,4 +187,4 @@ if args.source:
     files.sort()
 
     for filename in files:
-        translate(os.path.join(source_dir, filename))
+        process_file(os.path.join(source_dir, filename))
