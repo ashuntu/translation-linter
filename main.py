@@ -12,6 +12,10 @@ import argparse
 source_dir = ""
 file_mask = ""
 TARGET_LANG = "en"
+error_threshold = 0.8
+warning_threshold = 0.5
+notice_threshold = 0.2
+ok_threshold = 0.0
 
 
 # Everything above "OK" corresponds to a GitHub annotation level
@@ -35,10 +39,10 @@ class StatusData:
 
 
 DATA = {
-    WarningEnum.ERROR: StatusData(0.8, "🔴", "Highly likely offensive language", True),
-    WarningEnum.WARNING: StatusData(0.5, "🟠", "Likely offensive language", True),
-    WarningEnum.NOTICE: StatusData(0.2, "🟡", "Potentially offensive language", True),
-    WarningEnum.OK: StatusData(0, "🟢", "Ok", False),
+    WarningEnum.ERROR: StatusData(error_threshold, "🔴", "Highly likely offensive language", True),
+    WarningEnum.WARNING: StatusData(warning_threshold, "🟠", "Likely offensive language", True),
+    WarningEnum.NOTICE: StatusData(notice_threshold, "🟡", "Potentially offensive language", True),
+    WarningEnum.OK: StatusData(ok_threshold, "🟢", "Ok", False),
 }
 
 
@@ -167,6 +171,21 @@ parser.add_argument(
     help="Comma-separated string of file paths to check. These should be compatible with the file mask.",
     type=str,
 )
+parser.add_argument(
+    "--notice-level", "-n",
+    help="Float threshold between 0 and 1 for notice-level alerts",
+    type=str,
+)
+parser.add_argument(
+    "--warning-level", "-w",
+    help="Float threshold between 0 and 1 for warning-level alerts",
+    type=str,
+)
+parser.add_argument(
+    "--error-level", "-e",
+    help="Float threshold between 0 and 1 for error-level alerts",
+    type=str,
+)
 args = parser.parse_args()
 
 if not args.files and not args.source:
@@ -174,6 +193,13 @@ if not args.files and not args.source:
     sys.exit()
 
 file_mask = str(args.mask)
+
+if args.notice_level:
+    notice_threshold = float(args.notice_level)
+if args.warning_level:
+    warning_threshold = float(args.warning_level)
+if args.error_level:
+    error_threshold = float(args.error_level)
 
 # --files
 if args.files:

@@ -12,6 +12,15 @@ inputs:
     description: "List of files to check"
     required: true
     default: ""
+  notice-level:
+    description: "Threshold to show notice-level alerts (0-1)"
+    required: false
+  warning-level:
+    description: "Threshold to show warning-level alerts (0-1)"
+    required: false
+  error-level:
+    description: "Threshold to show error-level alerts (0-1)"
+    required: false
 runs:
   using: "docker"
   image: "Dockerfile"
@@ -22,3 +31,9 @@ runs:
     - ${{ inputs.file-mask }}
     - "--files"
     - ${{ inputs.files }}
+    - "--notice-level"
+    - ${{ inputs.notice-level }}
+    - "--warning-level"
+    - ${{ inputs.warning-level }}
+    - "--error-level"
+    - ${{ inputs.error-level }}
