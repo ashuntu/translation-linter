@@ -18,10 +18,11 @@ notice_threshold = 0.2
 ok_threshold = 0.0
 
 
-# Everything above "OK" corresponds to a GitHub annotation level
-# https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions
 class WarningEnum(Enum):
+    """Level corresponding to a GitHub annotation level.
 
+    More info: https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions
+    """
     OK = 0
     NOTICE = 1
     WARNING = 2
@@ -29,7 +30,8 @@ class WarningEnum(Enum):
 
 
 class StatusData:
-
+    """Wrapper around annotation data.
+    """
     def __init__(self, threshold: float, emoji: str, note: str, annotate: bool):
         
         self.threshold = threshold
@@ -38,7 +40,7 @@ class StatusData:
         self.annotate = annotate
 
 
-DATA = {
+ANNOTATION_LEVELS = {
     WarningEnum.ERROR: StatusData(error_threshold, "🔴", "Highly likely offensive language", True),
     WarningEnum.WARNING: StatusData(warning_threshold, "🟠", "Likely offensive language", True),
     WarningEnum.NOTICE: StatusData(notice_threshold, "🟡", "Potentially offensive language", True),
@@ -47,7 +49,8 @@ DATA = {
 
 
 def find_line(file_lines: list[str], lookup: str) -> int:
-
+    """Find the line number in which `lookup` occurs. Returns -1 if no such string is found.
+    """
     for num, line in enumerate(file_lines, 1):
         if lookup in line:
             return num
@@ -56,7 +59,10 @@ def find_line(file_lines: list[str], lookup: str) -> int:
 
 
 def init_language(from_code: str, to_code: str) -> bool:
+    """Initialize translations for the given language code mapping.
 
+    `from_code` and `to_code` are the corresponding language codes, ex. "en".
+    """
     argostranslate.package.update_package_index()
     available_packages = argostranslate.package.get_available_packages()
     valid_packages = list(filter(lambda x: x.from_code == from_code and x.to_code == to_code, available_packages))
@@ -70,12 +76,16 @@ def init_language(from_code: str, to_code: str) -> bool:
 
 
 def translate(text: str, from_code: str, to_code: str) -> str:
+    """Translate source `text` into the given language, returning the translated string.
 
+    `from_code` and `to_code` are the corresponding language codes, ex. "en".
+    """
     return argostranslate.translate.translate(text, from_code, to_code)
 
 
 def process_file(file_path: str):
-
+    """Process a file containing translations, outputting GitHub annotations.
+    """
     file_name = os.path.basename(file_path)
     matches = re.match(file_mask, file_name)
     if not matches or not matches.groups(1):
@@ -137,7 +147,7 @@ def process_file(file_path: str):
         prob = predict_prob([translated_text, text])
         max_prob: int = max(prob)
 
-        for level, status_data in DATA.items():
+        for level, status_data in ANNOTATION_LEVELS.items():
             if max_prob < status_data.threshold:
                 continue
             if status_data.annotate:
@@ -150,7 +160,7 @@ def process_file(file_path: str):
     line_log.sort(key=lambda x: x[0])
     log.extend([x[1] for x in line_log])
     log.append("::endgroup::")
-    log.insert(0, f"::group::{DATA[warning_level].emoji} Translating {file_name}")
+    log.insert(0, f"::group::{ANNOTATION_LEVELS[warning_level].emoji} Translating {file_name}")
     print("\n".join(log))
 
 
