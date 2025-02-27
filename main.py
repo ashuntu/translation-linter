@@ -13,8 +13,8 @@ source_dir = ""
 file_mask = ""
 TARGET_LANG = "en"
 error_threshold = 0.8
-warning_threshold = 0.5
-notice_threshold = 0.2
+warning_threshold = 0.6
+notice_threshold = 0.4
 ok_threshold = 0.0
 
 
@@ -83,6 +83,14 @@ def translate(text: str, from_code: str, to_code: str) -> str:
     return argostranslate.translate.translate(text, from_code, to_code)
 
 
+def analyze(text: str) -> int:
+    """Analyze `text` for profanity or sensitive content. Returns a value
+    between 0 (not profanity) to 1 (profanity).
+    """
+    prob = predict_prob([text])
+    return prob
+
+
 def process_file(file_path: str):
     """Process a file containing translations, outputting GitHub annotations.
     """
@@ -144,8 +152,7 @@ def process_file(file_path: str):
         # string in case any bad english words in the original get lost in
         # translation. Usually the original language probability is very low due
         # to this working on english only.
-        prob = predict_prob([translated_text, text])
-        max_prob: int = max(prob)
+        max_prob: int = max(analyze(translated_text), analyze(text))
 
         for level, status_data in ANNOTATION_LEVELS.items():
             if max_prob < status_data.threshold:
