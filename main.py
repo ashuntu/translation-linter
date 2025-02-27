@@ -87,8 +87,7 @@ def analyze(text: str) -> int:
     """Analyze `text` for profanity or sensitive content. Returns a value
     between 0 (not profanity) to 1 (profanity).
     """
-    prob = predict_prob([text])
-    return prob
+    return predict_prob([text])[0]
 
 
 def process_file(file_path: str):
