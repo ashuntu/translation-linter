@@ -122,7 +122,7 @@ def process_file(file_path: str):
 
     valid_language = init_language(from_code, to_code)
     if not valid_language:
-        log.append(f"::group::🔴 Translating {file_name}")
+        log.append(f"::group::⚪ Translating {file_name}")
         log.append("Could not translate this language")
         log.append("::endgroup::")
         print("\n".join(log))
