@@ -1,0 +1,14 @@
+msgid "openSource"
+msgstr "Open source"
+
+msgid "translation"
+msgstr "Translation"
+
+msgid "linting"
+msgstr "Linting"
+
+msgid "forJSONLikeTranslations"
+msgstr "For JSON-like translations"
+
+msgid "newTranslation1"
+msgstr "This is a new translation"

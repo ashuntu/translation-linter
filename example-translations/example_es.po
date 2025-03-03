@@ -1,0 +1,14 @@
+msgid "openSource"
+msgstr "Código abierto"
+
+msgid "translation"
+msgstr "traducción"
+
+msgid "linting"
+msgstr "pelusa"
+
+msgid "forJSONLikeTranslations"
+msgstr "Para traducciones tipo JSON"
+
+msgid "newTranslation1"
+msgstr "Esta es una nueva traducción"
