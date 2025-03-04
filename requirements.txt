@@ -1,3 +1,4 @@
 alt-profanity-check
 argostranslate
 polib
+spacy
