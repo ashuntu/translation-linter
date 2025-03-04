@@ -115,7 +115,7 @@ def process_file(translation_file: TranslationFile):
     log = []
     warning_level = WarningEnum.OK
 
-    if not translation_file.text:
+    if len(translation_file.translations) == 0:
         log.append(f"::group::⚫️ Translating {translation_file.file_name}")
         log.append("No translations in file")
         log.append("::endgroup::")
