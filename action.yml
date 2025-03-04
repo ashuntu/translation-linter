@@ -12,14 +12,23 @@ inputs:
     description: "List of files to check"
     required: true
     default: ""
-  notice-level:
-    description: "Threshold to show notice-level alerts (0-1)"
+  prof-notice-level:
+    description: "Threshold to show notice-level profanity alerts (0-1)"
     required: false
-  warning-level:
-    description: "Threshold to show warning-level alerts (0-1)"
+  prof-warning-level:
+    description: "Threshold to show warning-level profanity alerts (0-1)"
     required: false
-  error-level:
-    description: "Threshold to show error-level alerts (0-1)"
+  prof-error-level:
+    description: "Threshold to show error-level profanity alerts (0-1)"
+    required: false
+  sim-notice-level:
+    description: "Threshold to show notice-level similarity alerts (0-1)"
+    required: false
+  sim-warning-level:
+    description: "Threshold to show warning-level similarity alerts (0-1)"
+    required: false
+  sim-error-level:
+    description: "Threshold to show error-level similarity alerts (0-1)"
     required: false
 runs:
   using: "docker"
@@ -31,9 +40,15 @@ runs:
     - ${{ inputs.file-mask }}
     - "--files"
     - ${{ inputs.files }}
-    - "--notice-level"
-    - ${{ inputs.notice-level }}
-    - "--warning-level"
-    - ${{ inputs.warning-level }}
-    - "--error-level"
-    - ${{ inputs.error-level }}
+    - "--prof-notice-level"
+    - ${{ inputs.prof-notice-level }}
+    - "--prof-warning-level"
+    - ${{ inputs.prof-warning-level }}
+    - "--prof-error-level"
+    - ${{ inputs.prof-error-level }}
+    - "--sim-notice-level"
+    - ${{ inputs.sim-notice-level }}
+    - "--sim-warning-level"
+    - ${{ inputs.sim-warning-level }}
+    - "--sim-error-level"
+    - ${{ inputs.sim-error-level }}

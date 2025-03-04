@@ -1,3 +1,4 @@
+import warnings
 import argostranslate.package
 import argostranslate.translate
 import json
@@ -8,14 +9,22 @@ import sys
 import re
 import argparse
 import polib
+import spacy
+
+warnings.filterwarnings("ignore", message=r"\[W008\]", category=UserWarning)
 
 TARGET_LANG = "en"
 source_dir = ""
 file_mask = ""
-error_threshold = 0.8
-warning_threshold = 0.6
-notice_threshold = 0.4
+template_translation = None
+prof_error_threshold = 0.8
+prof_warning_threshold = 0.6
+prof_notice_threshold = 0.4
+sim_error_threshold = 0.8
+sim_warning_threshold = 0.6
+sim_notice_threshold = 0.4
 ok_threshold = 0.0
+nlp = None
 
 
 class TranslationFile:
@@ -53,10 +62,16 @@ class StatusData:
         self.annotate = annotate
 
 
-ANNOTATION_LEVELS = {
-    WarningEnum.ERROR: StatusData(error_threshold, "🔴", "Highly likely offensive language", True),
-    WarningEnum.WARNING: StatusData(warning_threshold, "🟠", "Likely offensive language", True),
-    WarningEnum.NOTICE: StatusData(notice_threshold, "🟡", "Potentially offensive language", True),
+PROFANITY_LEVELS = {
+    WarningEnum.ERROR: StatusData(prof_error_threshold, "🔴", "Highly likely offensive language", True),
+    WarningEnum.WARNING: StatusData(prof_warning_threshold, "🟠", "Likely offensive language", True),
+    WarningEnum.NOTICE: StatusData(prof_notice_threshold, "🟡", "Potentially offensive language", True),
+    WarningEnum.OK: StatusData(ok_threshold, "🟢", "Ok", False),
+}
+SIMILARITY_LEVELS = {
+    WarningEnum.ERROR: StatusData(sim_error_threshold, "🔴", "Translation not similar to original", True),
+    WarningEnum.WARNING: StatusData(sim_warning_threshold, "🟠", "Translation may not be similar to original", True),
+    WarningEnum.NOTICE: StatusData(sim_notice_threshold, "🟡", "Translation may not be similar to original", True),
     WarningEnum.OK: StatusData(ok_threshold, "🟢", "Ok", False),
 }
 
@@ -138,10 +153,6 @@ def process_file(translation_file: TranslationFile):
 
         line = find_line(translation_file.text.splitlines(), key)
 
-        translated_text = translate(value, from_code, to_code)
-        line_log.append((line, f"{line} ({from_code}): {value}"))
-        line_log.append((line, "{} ({}): {}".format(" " * len(f"{line}"), to_code, translated_text)))
-
         # Show error for empty strings
         if value.strip() == "":
             if warning_level.value < WarningEnum.ERROR.value:
@@ -149,13 +160,17 @@ def process_file(translation_file: TranslationFile):
             line_log.append((line, f"::{WarningEnum.ERROR.name.lower()} file={translation_file.file_path},line={line}::EMPTY STRING"))
             continue
 
+        translated_text = translate(value, from_code, to_code)
+        line_log.append((line, f"{line} ({from_code}): {value}"))
+        line_log.append((line, "{} ({}): {}".format(" " * len(f"{line}"), to_code, translated_text)))
+
         # We consider both the original language string and the translated
         # string in case any bad english words in the original get lost in
         # translation. Usually the original language probability is very low due
         # to this working on english only.
         max_prob: int = max(analyze(translated_text), analyze(value))
 
-        for level, status_data in ANNOTATION_LEVELS.items():
+        for level, status_data in PROFANITY_LEVELS.items():
             if max_prob < status_data.threshold:
                 continue
             if status_data.annotate:
@@ -164,27 +179,44 @@ def process_file(translation_file: TranslationFile):
                 warning_level = level
             break
 
+        similarity = 0.0
+        if template_translation is not None:
+            template_nlp = nlp(template_translation.translations[key])
+            translation_nlp = nlp(translated_text)
+            similarity = abs(template_nlp.similarity(translation_nlp) - 1)
+
+        for level, similarity_data in SIMILARITY_LEVELS.items():
+            if similarity < similarity_data.threshold:
+                continue
+            if similarity_data.annotate:
+                line_log.append((line, f"::{level.name.lower()} file={translation_file.file_path},line={line}::{similarity_data.note} ({similarity:.2f}): \"{translated_text}\""))
+            if warning_level.value < level.value:
+                warning_level = level
+            break
+
     # aggregate logs
     line_log.sort(key=lambda x: x[0])
     log.extend([x[1] for x in line_log])
     log.append("::endgroup::")
-    log.insert(0, f"::group::{ANNOTATION_LEVELS[warning_level].emoji} Translating {translation_file.file_name}")
+    log.insert(0, f"::group::{PROFANITY_LEVELS[warning_level].emoji} Translating {translation_file.file_name}")
     print("\n".join(log))
 
 
-def read_json(file_path: str) -> TranslationFile | None:
+def read_json(file_path: str, lang: str | None = None) -> TranslationFile | None:
     """Attempt to read `file_path` as a JSON file, returning its contents as a `TranslationFile`
     """
-    matches = re.match(file_mask, os.path.basename(file_path))
-    if not matches or not matches.groups(1):
-        return None
+    if lang is None:
+        matches = re.match(file_mask, os.path.basename(file_path))
+        if not matches or not matches.groups(1):
+            return None
+        lang = matches.groups(1)[0]
 
     try:
         with open(file_path, "r") as file:
             text = file.read()
             json_dict = json.loads(text)
             return TranslationFile(
-                lang=matches.groups(1)[0],
+                lang=lang,
                 file_path=file_path,
                 translations=json_dict,
                 text=text
@@ -193,19 +225,21 @@ def read_json(file_path: str) -> TranslationFile | None:
         return None
 
 
-def read_po(file_path: str) -> TranslationFile | None:
+def read_po(file_path: str, lang: str | None = None) -> TranslationFile | None:
     """Attempt to read `file_path` as a PO file, returning its contents as a `TranslationFile`
     """
-    matches = re.match(file_mask, os.path.basename(file_path))
-    if not matches or not matches.groups(1):
-        return None
+    if lang is None:
+        matches = re.match(file_mask, os.path.basename(file_path))
+        if not matches or not matches.groups(1):
+            return None
+        lang = matches.groups(1)[0]
 
     try:
         with open(file_path, "r") as file:
             text = file.read()
             po_file = polib.pofile(text)
             return TranslationFile(
-                lang=matches.groups(1)[0],
+                lang=lang,
                 file_path=file_path,
                 translations={entry.msgid: entry.msgstr for entry in po_file},
                 text=text
@@ -214,14 +248,14 @@ def read_po(file_path: str) -> TranslationFile | None:
         return None
 
 
-def read_file(file_path: str) -> TranslationFile | None:
+def read_file(file_path: str, lang: str | None = None) -> TranslationFile | None:
     """Read in the given file as a `TranslationFile`.
     """
-    json_file = read_json(file_path)
+    json_file = read_json(file_path, lang)
     if json_file is not None:
         return json_file
 
-    po_file = read_po(file_path)
+    po_file = read_po(file_path, lang)
     if po_file is not None:
         return po_file
 
@@ -246,18 +280,38 @@ parser.add_argument(
     type=str,
 )
 parser.add_argument(
-    "--notice-level", "-n",
-    help="Float threshold between 0 and 1 for notice-level alerts",
+    "--template", "-t",
+    help="Path to template file containing original, untranslated strings",
     type=str,
 )
 parser.add_argument(
-    "--warning-level", "-w",
-    help="Float threshold between 0 and 1 for warning-level alerts",
+    "--prof-notice-level", "-pn",
+    help="Float threshold between 0 and 1 for notice-level profanity alerts",
     type=str,
 )
 parser.add_argument(
-    "--error-level", "-e",
-    help="Float threshold between 0 and 1 for error-level alerts",
+    "--prof-warning-level", "-pw",
+    help="Float threshold between 0 and 1 for warning-level profanity alerts",
+    type=str,
+)
+parser.add_argument(
+    "--prof-error-level", "-pe",
+    help="Float threshold between 0 and 1 for error-level profanity alerts",
+    type=str,
+)
+parser.add_argument(
+    "--sim-notice-level", "-sn",
+    help="Float threshold between 0 and 1 for notice-level similarity alerts",
+    type=str,
+)
+parser.add_argument(
+    "--sim-warning-level", "-sw",
+    help="Float threshold between 0 and 1 for warning-level similarity alerts",
+    type=str,
+)
+parser.add_argument(
+    "--sim-error-level", "-se",
+    help="Float threshold between 0 and 1 for error-level similarity alerts",
     type=str,
 )
 args = parser.parse_args()
@@ -268,12 +322,26 @@ if not args.files and not args.source:
 
 file_mask = str(args.mask)
 
-if args.notice_level:
-    notice_threshold = float(args.notice_level)
-if args.warning_level:
-    warning_threshold = float(args.warning_level)
-if args.error_level:
-    error_threshold = float(args.error_level)
+if args.prof_notice_level:
+    prof_notice_threshold = float(args.prof_notice_level)
+if args.prof_warning_level:
+    prof_warning_threshold = float(args.prof_warning_level)
+if args.prof_error_level:
+    prof_error_threshold = float(args.prof_error_level)
+if args.sim_notice_level:
+    prof_notice_threshold = float(args.sim_notice_level)
+if args.sim_warning_level:
+    sim_warning_threshold = float(args.sim_warning_level)
+if args.sim_error_level:
+    sim_error_threshold = float(args.sim_error_level)
+
+if args.template:
+    temp = read_file(str(args.template), TARGET_LANG)
+    if temp is not None:
+        template_translation = temp
+        nlp = spacy.load("en_core_web_md")
+    else:
+        raise Exception(f"Could not parse template translation file {args.template}")
 
 # --files
 if args.files:
