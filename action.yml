@@ -12,6 +12,9 @@ inputs:
     description: "List of files to check"
     required: true
     default: ""
+  template:
+    description: "Path to template file containing original, untranslated strings"
+    required: false
   prof-notice-level:
     description: "Threshold to show notice-level profanity alerts (0-1)"
     required: false
@@ -40,6 +43,8 @@ runs:
     - ${{ inputs.file-mask }}
     - "--files"
     - ${{ inputs.files }}
+    - "--template"
+    - ${{ inputs.template }}
     - "--prof-notice-level"
     - ${{ inputs.prof-notice-level }}
     - "--prof-warning-level"

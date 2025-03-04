@@ -35,6 +35,20 @@ jobs:
           translation-dir: "example-translations"
           file-mask: "example_(.*)\\.po"
 
+  # Same as arb, but with similarity checking enabled with `template`
+  translation-lint-action-dir-arb-sim:
+    name: translations-dir-arb-sim
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: TranslationLint
+        uses: ./ # when actually using this action, replace with ashuntu/translation-linter
+        with:
+          translation-dir: "example-translations"
+          file-mask: "example_(.*)\\.arb"
+          template: "example-translations/example_en.arb"
+
   # Example for only checking changed translations files
   translation-lint-action-changed:
     name: translation-diff
