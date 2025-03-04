@@ -76,14 +76,15 @@ SIMILARITY_LEVELS = {
 }
 
 
-def find_line(file_lines: list[str], lookup: str) -> int:
+def find_line(text: str, lookup: str) -> int:
     """Find the line number in which `lookup` occurs. Returns -1 if no such string is found.
     """
-    for num, line in enumerate(file_lines, 1):
-        if lookup in line:
-            return num
+    lookup_index = text.find(lookup)
 
-    return -1
+    if lookup_index < 0:
+        return -1
+
+    return text[:lookup_index].count("\n") + 1
 
 
 def init_language(from_code: str, to_code: str) -> bool:
@@ -145,24 +146,26 @@ def process_file(translation_file: TranslationFile):
         print("\n".join(log))
         return
 
-    line_log: list[tuple[int, str]] = []
-
     for key, value in translation_file.translations.items():
         # json translations are not always str: str, but sometimes str: dict
         if not isinstance(value, str): continue
 
-        line = find_line(translation_file.text.splitlines(), key)
+        line = find_line(translation_file.text, key)
 
         # Show error for empty strings
         if value.strip() == "":
             if warning_level.value < WarningEnum.ERROR.value:
                 warning_level = WarningEnum.ERROR
-            line_log.append((line, f"::{WarningEnum.ERROR.name.lower()} file={translation_file.file_path},line={line}::EMPTY STRING"))
+            log.append("::{} file={},line={}::EMPTY STRING".format(
+                WarningEnum.ERROR.name.lower(),
+                translation_file.file_path,
+                line
+            ))
             continue
 
         translated_text = translate(value, from_code, to_code)
-        line_log.append((line, f"{line} ({from_code}): {value}"))
-        line_log.append((line, "{} ({}): {}".format(" " * len(f"{line}"), to_code, translated_text)))
+        log.append("{} ({}): {}".format(line, from_code, value))
+        log.append("{} ({}): {}".format(" " * len(f"{line}"), to_code, translated_text))
 
         # We consider both the original language string and the translated
         # string in case any bad english words in the original get lost in
@@ -174,7 +177,13 @@ def process_file(translation_file: TranslationFile):
             if max_prob < status_data.threshold:
                 continue
             if status_data.annotate:
-                line_log.append((line, f"::{level.name.lower()} file={translation_file.file_path},line={line}::{status_data.note} ({max_prob:.2f}): \"{translated_text}\""))
+                log.append("::{} file={},line={}::{} ({:.2f}): \"{}\"".format(
+                    level.name.lower(),
+                    translation_file.file_path,
+                    line,
+                    status_data.note, max_prob,
+                    translated_text
+                ))
             if warning_level.value < level.value:
                 warning_level = level
             break
@@ -189,16 +198,20 @@ def process_file(translation_file: TranslationFile):
             if similarity < similarity_data.threshold:
                 continue
             if similarity_data.annotate:
-                line_log.append((line, f"::{level.name.lower()} file={translation_file.file_path},line={line}::{similarity_data.note} ({similarity:.2f}): \"{translated_text}\""))
+                log.append("::{} file={},line={}::{} ({:.2f}): \"{}\"".format(
+                    level.name.lower(),
+                    translation_file.file_path,
+                    line,
+                    similarity_data.note,
+                    similarity,
+                    translated_text
+                ))
             if warning_level.value < level.value:
                 warning_level = level
             break
 
-    # aggregate logs
-    line_log.sort(key=lambda x: x[0])
-    log.extend([x[1] for x in line_log])
     log.append("::endgroup::")
-    log.insert(0, f"::group::{PROFANITY_LEVELS[warning_level].emoji} Translating {translation_file.file_name}")
+    log.insert(0, "::group::{} Translating {}".format(PROFANITY_LEVELS[warning_level].emoji, translation_file.file_name))
     print("\n".join(log))
 
 

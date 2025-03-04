@@ -20,8 +20,8 @@ Add the following as a GitHub workflow file (e.g. `.github/workflows/example-act
 ```yaml
 name: YOUR_WORKFLOW_NAME
 on:
-  workflow_dispatch: 
-  pull_request: 
+  workflow_dispatch:
+  pull_request:
   push:
     branches: [main]
 
@@ -42,6 +42,9 @@ jobs:
           # The first group match () should contain the language code
           # OPTIONAL
           file-mask: "app_(.*)\\.arb"
+          # File path to original, untranslated file for similarity checking
+          # OPTIONAL
+          template: "translations/app_en.arb"
 ```
 
 ### Testing Locally
