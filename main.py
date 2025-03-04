@@ -346,8 +346,7 @@ parser.add_argument(
 args = parser.parse_args(arg for arg in sys.argv[1:] if arg != "-")
 
 if not args.files and not args.source:
-    print("Either --source or --files is required")
-    sys.exit()
+    raise Exception("Either --source or --files is required")
 
 file_mask = str(args.mask)
 
