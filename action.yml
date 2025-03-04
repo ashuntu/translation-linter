@@ -12,6 +12,14 @@ inputs:
     description: "List of files to check"
     required: true
     default: ""
+  check-profanity:
+    description: "Enable/disable profanity checking, enabled by default"
+    required: false
+    default: true
+  check-similarity:
+    description: "Enable/disable similarity checking, enabled by default"
+    required: false
+    default: true
   template:
     description: "Path to template file containing original, untranslated strings"
     required: false
@@ -37,6 +45,8 @@ runs:
   using: "docker"
   image: "Dockerfile"
   args:
+    - ${{ inputs.check-profanity == 'false' && '--no-check-profanity' || '-' }}
+    - ${{ inputs.check-similarity == 'false' && '--no-check-similarity' || '-' }}
     - "--source"
     - ${{ inputs.translation-dir }}
     - "--mask"

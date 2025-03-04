@@ -66,3 +66,19 @@ jobs:
         with:
           file-mask: "example_(.*)\\.arb"
           files: ${{ steps.changed-files.outputs.all_changed_files }}
+
+  # Same as arb, but with similarity checking enabled with `template`
+  translation-lint-action-no-check:
+    name: translations-no-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: TranslationLint
+        uses: ./ # when actually using this action, replace with ashuntu/translation-linter
+        with:
+          translation-dir: "example-translations"
+          file-mask: "example_(.*)\\.arb"
+          template: "example-translations/example_en.arb"
+          check-profanity: false
+          check-similarity: false
