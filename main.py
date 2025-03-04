@@ -19,11 +19,13 @@ file_mask = ""
 template_translation = None
 prof_error_threshold = 0.9
 prof_warning_threshold = 0.75
-prof_notice_threshold = 0.5
+prof_notice_threshold = 0.6
 sim_error_threshold = 0.8
 sim_warning_threshold = 0.6
 sim_notice_threshold = 0.4
 ok_threshold = 0.0
+check_profanity = True
+check_similarity = True
 nlp = None
 
 
@@ -167,48 +169,50 @@ def process_file(translation_file: TranslationFile):
         log.append("{} ({}): {}".format(line, from_code, value))
         log.append("{} ({}): {}".format(" " * len(f"{line}"), to_code, translated_text))
 
-        # We consider both the original language string and the translated
-        # string in case any bad english words in the original get lost in
-        # translation. Usually the original language probability is very low due
-        # to this working on english only.
-        max_prob: int = max(analyze(translated_text), analyze(value))
+        if check_profanity:
+            # We consider both the original language string and the translated
+            # string in case any bad english words in the original get lost in
+            # translation. Usually the original language probability is very low due
+            # to this working on english only.
+            max_prob: int = max(analyze(translated_text), analyze(value))
 
-        for level, status_data in PROFANITY_LEVELS.items():
-            if max_prob < status_data.threshold:
-                continue
-            if status_data.annotate:
-                log.append("::{} file={},line={}::{} ({:.2f}): \"{}\"".format(
-                    level.name.lower(),
-                    translation_file.file_path,
-                    line,
-                    status_data.note, max_prob,
-                    translated_text
-                ))
-            if warning_level.value < level.value:
-                warning_level = level
-            break
+            for level, status_data in PROFANITY_LEVELS.items():
+                if max_prob < status_data.threshold:
+                    continue
+                if status_data.annotate:
+                    log.append("::{} file={},line={}::{} ({:.2f}): \"{}\"".format(
+                        level.name.lower(),
+                        translation_file.file_path,
+                        line,
+                        status_data.note, max_prob,
+                        translated_text
+                    ))
+                if warning_level.value < level.value:
+                    warning_level = level
+                break
 
-        similarity = 0.0
-        if template_translation is not None:
-            template_nlp = nlp(template_translation.translations[key])
-            translation_nlp = nlp(translated_text)
-            similarity = abs(template_nlp.similarity(translation_nlp) - 1)
+        if check_similarity:
+            similarity = 0.0
+            if template_translation is not None:
+                template_nlp = nlp(template_translation.translations[key])
+                translation_nlp = nlp(translated_text)
+                similarity = abs(template_nlp.similarity(translation_nlp) - 1)
 
-        for level, similarity_data in SIMILARITY_LEVELS.items():
-            if similarity < similarity_data.threshold:
-                continue
-            if similarity_data.annotate:
-                log.append("::{} file={},line={}::{} ({:.2f}): \"{}\"".format(
-                    level.name.lower(),
-                    translation_file.file_path,
-                    line,
-                    similarity_data.note,
-                    similarity,
-                    translated_text
-                ))
-            if warning_level.value < level.value:
-                warning_level = level
-            break
+            for level, similarity_data in SIMILARITY_LEVELS.items():
+                if similarity < similarity_data.threshold:
+                    continue
+                if similarity_data.annotate:
+                    log.append("::{} file={},line={}::{} ({:.2f}): \"{}\"".format(
+                        level.name.lower(),
+                        translation_file.file_path,
+                        line,
+                        similarity_data.note,
+                        similarity,
+                        translated_text
+                    ))
+                if warning_level.value < level.value:
+                    warning_level = level
+                break
 
     log.append("::endgroup::")
     log.insert(0, "::group::{} Translating {}".format(PROFANITY_LEVELS[warning_level].emoji, translation_file.file_name))
@@ -298,6 +302,18 @@ parser.add_argument(
     type=str,
 )
 parser.add_argument(
+    "--check-profanity",
+    help="Enable/disable profanity checking.",
+    action=argparse.BooleanOptionalAction,
+    default=True,
+)
+parser.add_argument(
+    "--check-similarity",
+    help="Enable/disable similarity checking.",
+    action=argparse.BooleanOptionalAction,
+    default=True,
+)
+parser.add_argument(
     "--prof-notice-level", "-pn",
     help="Float threshold between 0 and 1 for notice-level profanity alerts",
     type=str,
@@ -327,7 +343,7 @@ parser.add_argument(
     help="Float threshold between 0 and 1 for error-level similarity alerts",
     type=str,
 )
-args = parser.parse_args()
+args = parser.parse_args(arg for arg in sys.argv[1:] if arg != "-")
 
 if not args.files and not args.source:
     print("Either --source or --files is required")
@@ -347,6 +363,9 @@ if args.sim_warning_level:
     sim_warning_threshold = float(args.sim_warning_level)
 if args.sim_error_level:
     sim_error_threshold = float(args.sim_error_level)
+
+check_profanity = bool(args.check_profanity)
+check_similarity = bool(args.check_similarity)
 
 if args.template:
     temp = read_file(str(args.template), TARGET_LANG)
