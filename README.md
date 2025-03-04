@@ -44,6 +44,18 @@ jobs:
           file-mask: "app_(.*)\\.arb"
 ```
 
+### Testing Locally
+
+You can test this action locally by doing the following:
+
+1. Clone the repository
+2. Run `pip install -r requirements.txt`
+3. Run `python main.py`
+    ```shell
+    # For example...
+    python main.py --source example-translations --mask "example_(.*)\\.arb"
+    ```
+
 ## Output
 
 See the [most recent action run](https://github.com/ashuntu/translation-linter/actions) from this repo for an example of the output this action generates.

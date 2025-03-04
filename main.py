@@ -7,15 +7,28 @@ from enum import Enum
 import sys
 import re
 import argparse
+import polib
 
-
+TARGET_LANG = "en"
 source_dir = ""
 file_mask = ""
-TARGET_LANG = "en"
 error_threshold = 0.8
 warning_threshold = 0.6
 notice_threshold = 0.4
 ok_threshold = 0.0
+
+
+class TranslationFile:
+    """Wrapper of a single translation file.
+    """
+    def __init__(self, lang: str, file_path: str, translations: dict[str, str], text: str):
+
+        self.lang = lang
+        self.file_path = file_path
+        self.translations = translations
+        self.text = text
+
+        self.file_name = os.path.basename(file_path)
 
 
 class WarningEnum(Enum):
@@ -33,7 +46,7 @@ class StatusData:
     """Wrapper around annotation data.
     """
     def __init__(self, threshold: float, emoji: str, note: str, annotate: bool):
-        
+
         self.threshold = threshold
         self.emoji = emoji
         self.note = note
@@ -54,7 +67,7 @@ def find_line(file_lines: list[str], lookup: str) -> int:
     for num, line in enumerate(file_lines, 1):
         if lookup in line:
             return num
-        
+
     return -1
 
 
@@ -90,30 +103,20 @@ def analyze(text: str) -> int:
     return predict_prob([text])[0]
 
 
-def process_file(file_path: str):
+def process_file(translation_file: TranslationFile):
     """Process a file containing translations, outputting GitHub annotations.
     """
-    file_name = os.path.basename(file_path)
-    matches = re.match(file_mask, file_name)
-    if not matches or not matches.groups(1):
-        return
-
-    from_code = matches.groups(1)[0]
+    from_code = translation_file.lang
     to_code = TARGET_LANG
 
-    if from_code == TARGET_LANG:
+    if from_code == to_code:
         return
-
-    file = open(file_path, "r")
-    file_lines = file.readlines()
-    file_json = json.loads("\n".join(file_lines))
-    file.close()
 
     log = []
     warning_level = WarningEnum.OK
 
-    if not file_json:
-        log.append(f"::group::⚫️ Translating {file_name}")
+    if not translation_file.text:
+        log.append(f"::group::⚫️ Translating {translation_file.file_name}")
         log.append("No translations in file")
         log.append("::endgroup::")
         print("\n".join(log))
@@ -121,7 +124,7 @@ def process_file(file_path: str):
 
     valid_language = init_language(from_code, to_code)
     if not valid_language:
-        log.append(f"::group::⚪ Translating {file_name}")
+        log.append(f"::group::⚪ Translating {translation_file.file_name}")
         log.append("Could not translate this language")
         log.append("::endgroup::")
         print("\n".join(log))
@@ -129,35 +132,34 @@ def process_file(file_path: str):
 
     line_log: list[tuple[int, str]] = []
 
-    # translate values from json
-    for text in file_json:
-        if not isinstance(file_json[text], str): continue
+    for key, value in translation_file.translations.items():
+        # json translations are not always str: str, but sometimes str: dict
+        if not isinstance(value, str): continue
 
-        text: str = file_json[text]
-        line = find_line(file_lines, text)
+        line = find_line(translation_file.text.splitlines(), key)
 
-        translated_text = translate(text, from_code, to_code)
-        line_log.append((line, f"{line} ({from_code}): {text}"))
+        translated_text = translate(value, from_code, to_code)
+        line_log.append((line, f"{line} ({from_code}): {value}"))
         line_log.append((line, "{} ({}): {}".format(" " * len(f"{line}"), to_code, translated_text)))
 
         # Show error for empty strings
-        if text.strip() == "":
+        if value.strip() == "":
             if warning_level.value < WarningEnum.ERROR.value:
                 warning_level = WarningEnum.ERROR
-            line_log.append((line, f"::{WarningEnum.ERROR.name.lower()} file={file_path},line={line}::EMPTY STRING"))
+            line_log.append((line, f"::{WarningEnum.ERROR.name.lower()} file={translation_file.file_path},line={line}::EMPTY STRING"))
             continue
 
         # We consider both the original language string and the translated
         # string in case any bad english words in the original get lost in
         # translation. Usually the original language probability is very low due
         # to this working on english only.
-        max_prob: int = max(analyze(translated_text), analyze(text))
+        max_prob: int = max(analyze(translated_text), analyze(value))
 
         for level, status_data in ANNOTATION_LEVELS.items():
             if max_prob < status_data.threshold:
                 continue
             if status_data.annotate:
-                line_log.append((line, f"::{level.name.lower()} file={file_path},line={line}::{status_data.note} ({max_prob:.2f}): \"{translated_text}\""))
+                line_log.append((line, f"::{level.name.lower()} file={translation_file.file_path},line={line}::{status_data.note} ({max_prob:.2f}): \"{translated_text}\""))
             if warning_level.value < level.value:
                 warning_level = level
             break
@@ -166,8 +168,64 @@ def process_file(file_path: str):
     line_log.sort(key=lambda x: x[0])
     log.extend([x[1] for x in line_log])
     log.append("::endgroup::")
-    log.insert(0, f"::group::{ANNOTATION_LEVELS[warning_level].emoji} Translating {file_name}")
+    log.insert(0, f"::group::{ANNOTATION_LEVELS[warning_level].emoji} Translating {translation_file.file_name}")
     print("\n".join(log))
+
+
+def read_json(file_path: str) -> TranslationFile | None:
+    """Attempt to read `file_path` as a JSON file, returning its contents as a `TranslationFile`
+    """
+    matches = re.match(file_mask, os.path.basename(file_path))
+    if not matches or not matches.groups(1):
+        return None
+
+    try:
+        with open(file_path, "r") as file:
+            text = file.read()
+            json_dict = json.loads(text)
+            return TranslationFile(
+                lang=matches.groups(1)[0],
+                file_path=file_path,
+                translations=json_dict,
+                text=text
+            )
+    except:
+        return None
+
+
+def read_po(file_path: str) -> TranslationFile | None:
+    """Attempt to read `file_path` as a PO file, returning its contents as a `TranslationFile`
+    """
+    matches = re.match(file_mask, os.path.basename(file_path))
+    if not matches or not matches.groups(1):
+        return None
+
+    try:
+        with open(file_path, "r") as file:
+            text = file.read()
+            po_file = polib.pofile(text)
+            return TranslationFile(
+                lang=matches.groups(1)[0],
+                file_path=file_path,
+                translations={entry.msgid: entry.msgstr for entry in po_file},
+                text=text
+            )
+    except:
+        return None
+
+
+def read_file(file_path: str) -> TranslationFile | None:
+    """Read in the given file as a `TranslationFile`.
+    """
+    json_file = read_json(file_path)
+    if json_file is not None:
+        return json_file
+
+    po_file = read_po(file_path)
+    if po_file is not None:
+        return po_file
+
+    return None
 
 
 parser = argparse.ArgumentParser()
@@ -220,7 +278,9 @@ if args.error_level:
 # --files
 if args.files:
     for path in str(args.files).split(","):
-        process_file(path)
+        translation_file = read_file(path)
+        if translation_file is not None:
+            process_file(translation_file)
 
 # --source
 if args.source:
@@ -229,4 +289,6 @@ if args.source:
     files.sort()
 
     for filename in files:
-        process_file(os.path.join(source_dir, filename))
+        translation_file = read_file(os.path.join(source_dir, filename))
+        if translation_file is not None:
+            process_file(translation_file)

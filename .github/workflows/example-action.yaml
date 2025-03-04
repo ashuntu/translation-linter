@@ -1,7 +1,7 @@
 name: example-action
 on:
-  workflow_dispatch: 
-  pull_request: 
+  workflow_dispatch:
+  pull_request:
   push:
     branches: [main]
 
@@ -10,8 +10,8 @@ jobs:
   # Note that EN translations are effectively ignored (they are the source)
   # ES translations in this example should be acceptable and accurate
   # FR translations in this example should contain some unacceptable words
-  translation-lint-action-dir:
-    name: translations-dir
+  translation-lint-action-dir-arb:
+    name: translations-dir-arb
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,6 +21,19 @@ jobs:
         with:
           translation-dir: "example-translations"
           file-mask: "example_(.*)\\.arb"
+
+  # Same as above, but for .po files
+  translation-lint-action-dir-po:
+    name: translations-dir-po
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: TranslationLint
+        uses: ./ # when actually using this action, replace with ashuntu/translation-linter
+        with:
+          translation-dir: "example-translations"
+          file-mask: "example_(.*)\\.po"
 
   # Example for only checking changed translations files
   translation-lint-action-changed:
