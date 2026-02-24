@@ -27,6 +27,15 @@ ok_threshold = 0.0
 check_profanity = True
 check_similarity = True
 nlp = None
+translation_backend = "argos"
+google_api_key = None
+_google_client = None
+
+
+class BackendEnum(Enum):
+    """Translation backend to use for translating strings."""
+    ARGOS = "argos"
+    GOOGLE = "google"
 
 
 class TranslationFile:
@@ -90,7 +99,7 @@ def find_line(text: str, lookup: str) -> int:
 
 
 def init_language(from_code: str, to_code: str) -> bool:
-    """Initialize translations for the given language code mapping.
+    """Initialize translations for the given language code mapping using Argos Translate.
 
     `from_code` and `to_code` are the corresponding language codes, ex. "en".
     """
@@ -106,12 +115,33 @@ def init_language(from_code: str, to_code: str) -> bool:
     return True
 
 
-def translate(text: str, from_code: str, to_code: str) -> str:
-    """Translate source `text` into the given language, returning the translated string.
+def translate_argos(text: str, from_code: str, to_code: str) -> str:
+    """Translate source `text` using Argos Translate.
 
     `from_code` and `to_code` are the corresponding language codes, ex. "en".
     """
     return argostranslate.translate.translate(text, from_code, to_code)
+
+
+def translate_google(text: str, from_code: str, to_code: str) -> str:
+    """Translate source `text` using the Google Translate API.
+
+    `from_code` and `to_code` are the corresponding language codes, ex. "en".
+    Uses the globally initialized `_google_client`.
+    """
+    result = _google_client.translate(text, source_language=from_code, target_language=to_code)
+    return result["translatedText"]
+
+
+def translate(text: str, from_code: str, to_code: str) -> str:
+    """Translate source `text` into the given language, returning the translated string.
+
+    `from_code` and `to_code` are the corresponding language codes, ex. "en".
+    Uses the backend specified by `translation_backend`.
+    """
+    if translation_backend == BackendEnum.GOOGLE.value:
+        return translate_google(text, from_code, to_code)
+    return translate_argos(text, from_code, to_code)
 
 
 def analyze(text: str) -> int:
@@ -140,7 +170,7 @@ def process_file(translation_file: TranslationFile):
         print("\n".join(log))
         return
 
-    valid_language = init_language(from_code, to_code)
+    valid_language = translation_backend == BackendEnum.GOOGLE.value or init_language(from_code, to_code)
     if not valid_language:
         log.append(f"::group::⚪ Translating {translation_file.file_name}")
         log.append("Could not translate this language")
@@ -343,10 +373,27 @@ parser.add_argument(
     help="Float threshold between 0 and 1 for error-level similarity alerts",
     type=str,
 )
+parser.add_argument(
+    "--backend", "-b",
+    help="Translation backend to use. Options: 'argos' (default), 'google'.",
+    type=str,
+    choices=[b.value for b in BackendEnum],
+    default=BackendEnum.ARGOS.value,
+)
 args = parser.parse_args(arg for arg in sys.argv[1:] if arg != "-")
 
 if not args.files and not args.source:
     raise Exception("Either --source or --files is required")
+
+translation_backend = args.backend
+
+if translation_backend == BackendEnum.GOOGLE.value:
+    google_api_key = os.environ.get("GOOGLE_API_KEY")
+    if not google_api_key:
+        raise Exception("GOOGLE_API_KEY environment variable is required when using the Google Translate backend")
+    from google.cloud import translate_v2 as google_translate
+    from google.api_core.client_options import ClientOptions
+    _google_client = google_translate.Client(client_options=ClientOptions(api_key=google_api_key))
 
 file_mask = str(args.mask)
 

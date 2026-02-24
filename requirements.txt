@@ -1,4 +1,5 @@
 alt-profanity-check
 argostranslate
+google-cloud-translate
 polib
 spacy

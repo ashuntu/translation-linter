@@ -5,7 +5,8 @@ review. Also automatically checks for potentially offensive language in
 translation files, as well as translation similarity.
 
 Auto-translations are provided by [Argos
-Translate](https://github.com/argosopentech/argos-translate), profanity checking
+Translate](https://github.com/argosopentech/argos-translate) (default) or the
+[Google Translate API](https://cloud.google.com/translate), profanity checking
 provided by [(Alt) Profanity
 Check](https://github.com/dimitrismistriotis/alt-profanity-check), and similarity checking is done by [spaCy](https://github.com/explosion/spaCy).
 
@@ -46,6 +47,12 @@ jobs:
           # File path to original, untranslated file for similarity checking
           # OPTIONAL
           template: "translations/app_en.arb"
+          # Translation backend to use. Options: 'argos' (default), 'google'
+          # OPTIONAL
+          # backend: "argos"
+          # Google Cloud API key, required when backend is 'google'
+          # OPTIONAL
+          # google-api-key: ${{ secrets.GOOGLE_API_KEY }}
 ```
 
 *You may also customize the thresholds for profanity/similarity warnings. See

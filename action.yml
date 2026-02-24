@@ -41,6 +41,13 @@ inputs:
   sim-error-level:
     description: "Threshold to show error-level similarity alerts (0-1)"
     required: false
+  backend:
+    description: "Translation backend to use. Options: 'argos' (default), 'google'."
+    required: false
+    default: "argos"
+  google-api-key:
+    description: "Google Cloud API key, required when backend is 'google'. Set via GOOGLE_API_KEY environment variable."
+    required: false
 runs:
   using: "docker"
   image: "Dockerfile"
@@ -67,3 +74,7 @@ runs:
     - ${{ inputs.sim-warning-level }}
     - "--sim-error-level"
     - ${{ inputs.sim-error-level }}
+    - "--backend"
+    - ${{ inputs.backend }}
+  env:
+    GOOGLE_API_KEY: ${{ inputs.google-api-key }}
